@@ -7690,13 +7690,20 @@ var nobleCurves = (() => {
   }
 
   // The order seats show in at a showdown where players choose (8.2; the engine's
-  // begin_choice): from the last seat that bet, raised or went all in on the river, else
+  // begin_choice, 18.4): from the seat of the last entry on the river that raised the
+  // street's bet (a bet, a raise, or an all in whose street_bet is above every street_bet
+  // before it on the river, 0 when none: an all in that calls for less is a call), else
   // from the first seat still in after the button; then clockwise.
   function showdownOrder(manifest, entries, live) {
     const numbers = manifest.seats.map((s) => s.seat), b = manifest.button;
     const liveOrder = numbers.filter((x) => x > b).concat(numbers.filter((x) => x <= b)).filter((x) => live.includes(x));
-    const river = entries.filter((e) => e.street === "river" && (e.action === "bet" || e.action === "raise" || e.action === "all_in"));
-    const aggressor = river.length ? river[river.length - 1].seat : null;
+    let high = 0, aggressor = null;
+    for (const e of entries) {
+      if (e.street !== "river") continue;
+      const bet = Number.isSafeInteger(e.street_bet) ? e.street_bet : 0;
+      if ((e.action === "bet" || e.action === "raise" || e.action === "all_in") && bet > high) aggressor = e.seat;
+      high = Math.max(high, bet);
+    }
     const first = aggressor !== null && liveOrder.includes(aggressor) ? aggressor : liveOrder[0];
     const at = liveOrder.indexOf(first);
     return liveOrder.slice(at).concat(liveOrder.slice(0, at));
